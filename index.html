@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Snake — Obstacle Selection Added</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root{
+      --bg:#070707; --accent:#00ff66; --muted:#9aa0a6; --panel:#0b0b0b;
+      --ui-radius:10px; --font:Inter, "Segoe UI", Roboto, Arial, sans-serif;
+      --canvas-size:640px;
+    }
+    html,body{height:100%;margin:0;background:linear-gradient(180deg,#050505,#0b0b0b);font-family:var(--font);color:var(--accent);display:flex;align-items:center;justify-content:center;}
+    .layout{width:1000px;max-width:96%;display:flex;gap:18px;padding:18px;align-items:flex-start;}
+    .controls{width:340px;background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));border-radius:12px;padding:16px;box-shadow:0 8px 30px rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.03);}
+    h1{margin:0 0 10px 0;font-size:20px;color:var(--accent);}
+    label{display:block;margin-top:10px;color:var(--muted);font-size:13px;}
+    select,button,input[type="range"],input[type="checkbox"]{width:100%;padding:9px;border-radius:8px;border:none;margin-top:8px;background:linear-gradient(180deg,#e6ffe9,#d6ffd9);color:#001;font-weight:700;cursor:pointer;}
+    .row{display:flex;gap:8px;margin-top:12px;}
+    .btn-primary{background:linear-gradient(180deg,#00ff88,#00cc66);padding:10px;border-radius:8px;border:none;}
+    .btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.03);padding:8px;border-radius:8px;color:var(--muted);}
+    .meta{display:flex;justify-content:space-between;gap:8px;margin-top:12px;}
+    .meta .box{background:rgba(255,255,255,0.03);padding:8px;border-radius:8px;color:var(--muted);font-weight:700;}
+    .game{flex:1;display:flex;flex-direction:column;align-items:center;gap:12px;position:relative;}
+    canvas{width:var(--canvas-size);height:var(--canvas-size);background:#000;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,0.7);border:1px solid rgba(0,255,102,0.06);touch-action:none;display:block;}
+    .footer{width:100%;display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:13px;}
+    .tab-content{margin-top:10px;color:var(--muted);font-size:13px;white-space:pre-wrap;min-height:120px;}
+    .active-power{margin-top:10px;color:#fff;font-size:13px;background:rgba(255,255,255,0.03);padding:8px;border-radius:8px;}
+    .small{font-size:12px;color:var(--muted);margin-top:6px;}
+    @media (max-width:980px){ .layout{flex-direction:column;align-items:center;} canvas{width:520px;height:520px;} }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="controls" id="controlsPanel">
+      <h1>Snake Controls</h1>
+
+      <label for="level">Level / Map</label>
+      <select id="level">
+        <option value="0">Open Field</option>
+        <option value="1">Forest</option>
+        <option value="2">Maze</option>
+        <option value="3">Moving Blocks</option>
+      </select>
+
+      <label for="obstacleType">Obstacles</label>
+      <select id="obstacleType">
+        <option value="none">None</option>
+        <option value="static">Static Blocks</option>
+        <option value="moving">Moving Blocks</option>
+        <option value="maze">Predefined Maze</option>
+      </select>
+
+      <label for="obstacleDensity">Obstacle Density</label>
+      <input id="obstacleDensity" type="range" min="0" max="100" step="5" value="30" />
+
+      <label style="margin-top:8px;">
+        <input id="obstacleToggle" type="checkbox" style="width:auto;margin-right:8px;vertical-align:middle;" checked />
+        Enable Obstacles
+      </label>
+      <div class="small">Change type or density and press Start to apply. Toggle enables/disables obstacles live.</div>
+
+      <label for="theme">Theme</label>
+      <select id="theme">
+        <option value="classic">Classic Green</option>
+        <option value="neon">Neon</option>
+        <option value="rainbow">Rainbow</option>
+        <option value="colorblind">Colorblind</option>
+      </select>
+
+      <label for="difficulty">Difficulty</label>
+      <select id="difficulty">
+        <option value="easy">Easy</option>
+        <option value="normal" selected>Normal</option>
+        <option value="hard">Hard</option>
+      </select>
+
+      <div class="row">
+        <button id="startBtn" type="button" class="btn-primary">Start</button>
+        <button id="pauseBtn" type="button" class="btn-ghost" hidden>Pause</button>
+      </div>
+
+      <div class="row">
+        <button id="restartBtn" type="button" class="btn-ghost" hidden>Restart</button>
+        <button id="muteBtn" type="button" class="btn-ghost">Mute SFX</button>
+      </div>
+
+      <div class="meta">
+        <div class="box">Score: <span id="score">0</span></div>
+        <div class="box">High: <span id="high">0</span></div>
+      </div>
+
+      <div class="active-power" id="activePower">Active: None</div>
+
+      <label for="mobile">Mobile Controls</label>
+      <select id="mobile">
+        <option value="swipe" selected>Swipe</option>
+        <option value="dpad">On-screen D-pad</option>
+      </select>
+
+      <label for="smooth">Smoothness</label>
+      <input id="smooth" type="range" min="0" max="1" step="0.05" value="0.6">
+
+      <div style="margin-top:12px;">
+        <label for="tabs">More</label>
+        <select id="tabs">
+          <option value="instructions">Instructions</option>
+          <option value="contact">Contact Developer</option>
+        </select>
+        <div id="tabContent" class="tab-content"></div>
+      </div>
+    </aside>
+
+    <main class="game">
+      <canvas id="gameCanvas" width="640" height="640" aria-label="Snake game canvas"></canvas>
+      <div class="footer">
+        <div class="hint">Use Arrow keys or WASD. Space to pause/resume. Swipe on mobile.</div>
+        <div style="color:var(--muted)">Collect power-ups and avoid obstacles.</div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+  (function(){
+    // Elements
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d', { alpha: false });
+    const startBtn = document.getElementById('startBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const restartBtn = document.getElementById('restartBtn');
+    const muteBtn = document.getElementById('muteBtn');
+    const scoreEl = document.getElementById('score');
+    const highEl = document.getElementById('high');
+    const levelSel = document.getElementById('level');
+    const themeSel = document.getElementById('theme');
+    const diffSel = document.getElementById('difficulty');
+    const mobileSel = document.getElementById('mobile');
+    const smoothRange = document.getElementById('smooth');
+    const tabs = document.getElementById('tabs');
+    const tabContent = document.getElementById('tabContent');
+    const activePowerEl = document.getElementById('activePower');
+
+    // New obstacle controls
+    const obstacleTypeSel = document.getElementById('obstacleType');
+    const obstacleDensity = document.getElementById('obstacleDensity');
+    const obstacleToggle = document.getElementById('obstacleToggle');
+
+    // Audio
+    const eatSfx = new Audio('https://actions.google.com/sounds/v1/cartoon/pop.ogg');
+    const crashSfx = new Audio('https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg');
+    let sfxMuted = false;
+
+    // Grid
+    const SIZE = 640;
+    const GRID = 32;
+    const CELL = SIZE / GRID;
+
+    // State
+    let snake = [];
+    let dir = { x: 1, y: 0 };
+    let nextDir = null;
+    let food = { x: 0, y: 0 };
+    let obstacles = [];
+    let powerUps = [];
+    let score = 0;
+    let high = parseInt(localStorage.getItem('snakeHigh') || '0', 10) || 0;
+    let running = false;
+    let tickTarget = 110;
+    let tickCurrent = tickTarget;
+    let tickTimer = null;
+    let smooth = parseFloat(smoothRange.value) || 0.6;
+    let recording = false;
+    let replayFrames = [];
+    let activePower = null;
+
+    // Helpers
+    function randGrid(){ return Math.floor(Math.random()*GRID); }
+    function gridToPx(gx,gy){ return { x: gx*CELL, y: gy*CELL }; }
+    function notify(text, ms=1400){ console.log(text); }
+
+    // Tabs
+    function showInstructions(){
+      tabContent.textContent =
+`Instructions
+
+• Choose obstacle type and density in the left panel.
+• Toggle "Enable Obstacles" to enable/disable obstacles live.
+• Press Start to apply settings and begin the game.
+• Controls: Arrow keys or WASD. Space to pause/resume.`;
+    }
+    function showContact(){
+      tabContent.innerText = 'Contact Developer\n\nEmail: ahmadmehdirizvi786@gmail.com\n\nInclude browser and steps to reproduce.';
+    }
+    tabs.addEventListener('change', ()=>{ if (tabs.value==='instructions') showInstructions(); else showContact(); });
+    tabs.value = 'instructions'; showInstructions();
+
+    // Obstacle generation helpers
+    function generateObstaclesFromSettings(){
+      const type = obstacleTypeSel.value;
+      const density = parseInt(obstacleDensity.value,10) || 30;
+      const enabled = obstacleToggle.checked;
+      if (!enabled || type === 'none') return [];
+      const count = Math.round((density/100) * (GRID*GRID) * 0.06); // scale factor for reasonable counts
+      const arr = [];
+      if (type === 'static'){
+        let tries=0;
+        while (arr.length < count && tries < count*10){
+          const x = randGrid(), y = randGrid();
+          tries++;
+          if (!arr.some(o=>o.x===x && o.y===y)) arr.push({x,y,moving:false});
+        }
+      } else if (type === 'moving'){
+        let tries=0;
+        while (arr.length < count && tries < count*12){
+          const x = randGrid(), y = randGrid();
+          tries++;
+          if (!arr.some(o=>o.x===x && o.y===y)) arr.push({x,y,moving:true,phase:Math.random()*Math.PI*2});
+        }
+      } else if (type === 'maze'){
+        // simple maze pattern: vertical and horizontal walls
+        for (let x=2; x<GRID-2; x+=3){
+          for (let y=2; y<GRID-2; y++){
+            if (Math.random() < density/120) arr.push({x,y,moving:false});
+          }
+        }
+        for (let y=2; y<GRID-2; y+=4){
+          for (let x=2; x<GRID-2; x++){
+            if (Math.random() < density/140) arr.push({x,y,moving:false});
+          }
+        }
+      }
+      return arr;
+    }
+
+    // Reset
+    function resetState(){
+      snake = [];
+      const sx = Math.floor(GRID/2), sy = Math.floor(GRID/2);
+      for(let i=0;i<6;i++) snake.push({ x: sx - i, y: sy });
+      dir = { x:1, y:0 }; nextDir = null;
+      score = 0; powerUps = [];
+      // apply obstacle settings
+      obstacles = generateObstaclesFromSettings();
+      // ensure obstacles don't overlap starting snake
+      obstacles = obstacles.filter(o => !snake.some(s=>s.x===o.x && s.y===o.y));
+      placeFood();
+      tickTarget = diffSel.value === 'easy' ? 140 : (diffSel.value === 'hard' ? 80 : 110);
+      tickCurrent = tickTarget;
+      running = true; recording = true; replayFrames = [];
+      scoreEl.textContent = score; highEl.textContent = high;
+      pauseBtn.hidden = false; restartBtn.hidden = true;
+      activePower = null; activePowerEl.textContent = 'Active: None';
+    }
+
+    function placeFood(){
+      let tries=0;
+      do { food.x = randGrid(); food.y = randGrid(); tries++; if (tries>1000) break; }
+      while (snake.some(s=>s.x===food.x && s.y===food.y) || obstacles.some(o=>o.x===food.x && o.y===food.y));
+    }
+
+    // Power spawn (kept simple)
+    let powerSpawnTimer = 0;
+    function maybeSpawnPower(dt){
+      powerSpawnTimer -= dt;
+      if (powerSpawnTimer <= 0){
+        powerSpawnTimer = 3000 + Math.random()*6000;
+        if (Math.random() < 0.6){
+          let tries=0, px,py;
+          do { px = randGrid(); py = randGrid(); tries++; if (tries>500) break; }
+          while (snake.some(s=>s.x===px && s.y===py) || obstacles.some(o=>o.x===px && o.y===py) || (food.x===px && food.y===py));
+          const types = ['slow','shrink','double','invincible','speed','scissors','magnet','scoreDoubler'];
+          const type = types[Math.floor(Math.random()*types.length)];
+          powerUps.push({ x:px, y:py, type, created:Date.now() });
+        }
+      }
+    }
+
+    // Apply power-up (kept same as before)
+    const POWER_DUR = { slow:7000, shrink:0, double:8000, invincible:6000, speed:5000, scissors:0, magnet:8000, scoreDoubler:10000 };
+    function applyPower(type){
+      if (type === 'shrink'){ for (let i=0;i<3;i++) if (snake.length>3) snake.pop(); notify('Shrink'); }
+      else if (type === 'scissors'){ for (let i=0;i<6;i++) if (snake.length>3) snake.pop(); notify('Scissors'); }
+      else if (type === 'slow'){ activePower={type:'slow',expires:Date.now()+POWER_DUR.slow}; tickTarget += 80; notify('Slow'); }
+      else if (type === 'double'){ activePower={type:'double',expires:Date.now()+POWER_DUR.double}; notify('Double'); }
+      else if (type === 'invincible'){ activePower={type:'invincible',expires:Date.now()+POWER_DUR.invincible}; notify('Invincible'); }
+      else if (type === 'speed'){ activePower={type:'speed',expires:Date.now()+POWER_DUR.speed}; tickTarget = Math.max(30, tickTarget-60); notify('Speed'); }
+      else if (type === 'magnet'){ activePower={type:'magnet',expires:Date.now()+POWER_DUR.magnet}; notify('Magnet'); }
+      else if (type === 'scoreDoubler'){ activePower={type:'scoreDoubler',expires:Date.now()+POWER_DUR.scoreDoubler}; notify('Score Doubler'); }
+      try{ new Audio('https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg').play(); }catch(e){}
+      updateActiveDisplay();
+    }
+
+    function updateActivePower(){
+      if (!activePower) return;
+      if (Date.now() > activePower.expires){
+        if (activePower.type === 'slow' || activePower.type === 'speed'){ tickTarget = diffSel.value === 'easy' ? 140 : (diffSel.value === 'hard' ? 80 : 110); }
+        activePower = null;
+        updateActiveDisplay();
+      } else updateActiveDisplay();
+    }
+    function updateActiveDisplay(){ if (!activePower){ activePowerEl.textContent = 'Active: None'; return; } const remaining = Math.max(0, Math.ceil((activePower.expires - Date.now())/1000)); activePowerEl.textContent = `Active: ${activePower.type} (${remaining}s)`; }
+
+    // Obstacles movement
+    function updateObstacles(dt){
+      for (const o of obstacles){
+        if (!o.moving) continue;
+        o.phase = (o.phase || 0) + dt/600;
+        const span = 4;
+        if (o.dx){ const base = o._baseX === undefined ? (o._baseX=o.x) : o._baseX; o.x = (Math.round(base + Math.sin(o.phase)*span)+GRID)%GRID; }
+        else { const base = o._baseY === undefined ? (o._baseY=o.y) : o._baseY; o.y = (Math.round(base + Math.cos(o.phase)*span)+GRID)%GRID; }
+      }
+    }
+
+    // Magnet effect (if active)
+    function applyMagnetEffect(){
+      if (!activePower || activePower.type !== 'magnet') return;
+      const head = snake[0];
+      const dx = head.x - food.x;
+      const dy = head.y - food.y;
+      if (dx === 0 && dy === 0) return;
+      if (Math.abs(dx) >= Math.abs(dy)){ food.x += Math.sign(dx); if (food.x < 0) food.x = GRID-1; if (food.x >= GRID) food.x = 0; }
+      else { food.y += Math.sign(dy); if (food.y < 0) food.y = GRID-1; if (food.y >= GRID) food.y = 0; }
+    }
+
+    // Tick
+    let lastTime = performance.now();
+    function tick(){
+      if (!running) return;
+      const now = performance.now();
+      const dt = now - lastTime;
+      lastTime = now;
+
+      tickCurrent += (tickTarget - tickCurrent) * (1 - Math.pow(1 - smooth, dt/16));
+      updateObstacles(dt);
+
+      if (nextDir){ if (!(nextDir.x === -dir.x && nextDir.y === -dir.y)) dir = nextDir; nextDir = null; }
+
+      // magnet moves food toward head before computing head move
+      if (activePower && activePower.type === 'magnet') applyMagnetEffect();
+
+      let head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+      if (head.x < 0) head.x = GRID-1; if (head.y < 0) head.y = GRID-1;
+      if (head.x >= GRID) head.x = 0; if (head.y >= GRID) head.y = 0;
+
+      if (obstacles.some(o=>o.x===head.x && o.y===head.y)){ gameOver(); return; }
+      if (!(activePower && activePower.type==='invincible') && snake.some(s=>s.x===head.x && s.y===head.y)){ gameOver(); return; }
+
+      snake.unshift(head);
+
+      if (head.x===food.x && head.y===food.y){
+        const pts = (activePower && activePower.type==='scoreDoubler') ? 2 : 1;
+        score += pts;
+        try{ eatSfx.currentTime=0; eatSfx.play(); }catch(e){}
+        placeFood();
+        tickTarget = Math.max(30, tickTarget - 2);
+      } else snake.pop();
+
+      for (let i=powerUps.length-1;i>=0;i--){
+        const p = powerUps[i];
+        if (p.x===head.x && p.y===head.y){ applyPower(p.type); powerUps.splice(i,1); }
+      }
+
+      maybeSpawnPower(dt);
+      updateActivePower();
+      scoreEl.textContent = score;
+
+      if (recording && Math.random()<0.6) captureFrame();
+
+      if (tickTimer) clearTimeout(tickTimer);
+      tickTimer = setTimeout(tick, tickCurrent);
+    }
+
+    function startGame(){
+      smooth = parseFloat(smoothRange.value);
+      resetState();
+      lastTime = performance.now();
+      if (tickTimer) clearTimeout(tickTimer);
+      tickTimer = setTimeout(tick, tickCurrent);
+      startBtn.disabled = true;
+      pauseBtn.hidden = false;
+      notify('Game started');
+    }
+
+    function pauseGame(){
+      running = false;
+      if (tickTimer) clearTimeout(tickTimer);
+      pauseBtn.textContent = 'Resume';
+    }
+
+    function restartTick(){ if (tickTimer) clearTimeout(tickTimer); tickTimer = setTimeout(tick, tickCurrent); }
+
+    function gameOver(){
+      running = false;
+      if (tickTimer) clearTimeout(tickTimer);
+      try{ crashSfx.currentTime=0; crashSfx.play(); }catch(e){}
+      notify('Game Over — Score: ' + score);
+      restartBtn.hidden = false; pauseBtn.hidden = true;
+      if (score > high){ high = score; localStorage.setItem('snakeHigh', String(high)); notify('New High Score: ' + score); }
+      recording = false;
+      highEl.textContent = high;
+    }
+
+    // Replay capture
+    function captureFrame(){ try{ const data = canvas.toDataURL('image/webp',0.6); replayFrames.push(data); if (replayFrames.length>300) replayFrames.shift(); }catch(e){} }
+
+    // Rendering
+    function clearCanvas(){ ctx.fillStyle='#000'; ctx.fillRect(0,0,SIZE,SIZE); }
+
+    function render(){
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      if (canvas.width !== SIZE * dpr || canvas.height !== SIZE * dpr){ canvas.width = SIZE * dpr; canvas.height = SIZE * dpr; canvas.style.width = SIZE + 'px'; canvas.style.height = SIZE + 'px'; ctx.setTransform(dpr,0,0,dpr,0,0); }
+
+      clearCanvas();
+
+      // obstacles
+      for (const o of obstacles){
+        const p = gridToPx(o.x,o.y);
+        ctx.fillStyle = themeSel.value==='neon' ? '#004f7f' : '#555';
+        ctx.fillRect(p.x+2,p.y+2,CELL-4,CELL-4);
+        ctx.strokeStyle='rgba(0,0,0,0.25)'; ctx.strokeRect(p.x+2,p.y+2,CELL-4,CELL-4);
+      }
+
+      // food
+      const fp = gridToPx(food.x,food.y);
+      ctx.save(); ctx.beginPath(); ctx.fillStyle='#ff3b3b'; ctx.shadowColor='#ff3b3b'; ctx.shadowBlur=12; ctx.arc(fp.x+CELL/2,fp.y+CELL/2,CELL*0.5,0,Math.PI*2); ctx.fill(); ctx.restore();
+
+      // power-ups
+      for (const p of powerUps){
+        const pp = gridToPx(p.x,p.y);
+        let color = '#ffd700';
+        if (p.type==='slow') color='#66ccff';
+        if (p.type==='shrink') color='#ff66b2';
+        if (p.type==='double') color='#ffcf33';
+        if (p.type==='invincible') color='#b3ff66';
+        if (p.type==='speed') color='#ff6b3b';
+        if (p.type==='scissors') color='#ffffff';
+        if (p.type==='magnet') color='#9b59b6';
+        if (p.type==='scoreDoubler') color='#00d1ff';
+        ctx.save(); ctx.beginPath(); ctx.fillStyle=color; ctx.shadowColor=color; ctx.shadowBlur=10; ctx.arc(pp.x+CELL/2,pp.y+CELL/2,CELL*0.38,0,Math.PI*2); ctx.fill(); ctx.restore();
+        ctx.fillStyle = '#000'; ctx.font = `${Math.max(10, CELL*0.22)}px system-ui`; ctx.textAlign='center'; ctx.textBaseline='middle';
+        const label = p.type==='scissors' ? '✂' : (p.type==='magnet' ? '⤧' : (p.type==='scoreDoubler' ? '2x' : p.type[0].toUpperCase()));
+        ctx.fillText(label, pp.x+CELL/2, pp.y+CELL/2 + 1);
+      }
+
+      // connectors
+      ctx.lineWidth = CELL*0.9; ctx.lineCap='round'; ctx.lineJoin='round';
+      let stroke = '#00ff66'; if (themeSel.value==='neon') stroke='#00f7ff'; if (themeSel.value==='colorblind') stroke='#0072b2';
+      ctx.strokeStyle = stroke; ctx.shadowColor = 'rgba(0,255,102,0.12)'; ctx.shadowBlur = 12;
+      for (let i=1;i<snake.length;i++){
+        const a = snake[i-1], b = snake[i];
+        let dx = b.x - a.x, dy = b.y - a.y;
+        if (dx > GRID/2) dx -= GRID; if (dx < -GRID/2) dx += GRID;
+        if (dy > GRID/2) dy -= GRID; if (dy < -GRID/2) dy += GRID;
+        if (Math.abs(dx)+Math.abs(dy) <= 1){
+          const aPx = gridToPx(a.x,a.y), ax = aPx.x + CELL/2, ay = aPx.y + CELL/2;
+          const bx = ax + dx*CELL, by = ay + dy*CELL;
+          ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by); ctx.stroke();
+        }
+      }
+      ctx.shadowBlur = 0;
+
+      // segments
+      for (let i=0;i<snake.length;i++){
+        const s = snake[i]; const p = gridToPx(s.x,s.y); const cx = p.x+CELL/2, cy = p.y+CELL/2;
+        ctx.beginPath();
+        let fill = i===0 ? '#00ff88' : '#007f3a';
+        if (themeSel.value==='neon') fill = i===0 ? '#7fffff' : '#00a3ff';
+        if (themeSel.value==='colorblind') fill = i===0 ? '#66c2ff' : '#005b8a';
+        if (themeSel.value==='rainbow'){ const colors=['#ff3b3b','#ffcf33','#00ff66','#00f7ff','#6b5cff','#ff3bff']; fill = colors[i % colors.length]; }
+        ctx.fillStyle = fill; ctx.shadowColor = fill; ctx.shadowBlur = i===0 ? 12 : 6;
+        ctx.arc(cx,cy,CELL*0.45,0,Math.PI*2); ctx.fill(); ctx.shadowBlur = 0;
+        ctx.strokeStyle='rgba(0,0,0,0.25)'; ctx.lineWidth=1; ctx.stroke();
+        if (i===0) drawEyes(cx,cy);
+      }
+
+      // HUD
+      ctx.fillStyle='rgba(255,255,255,0.04)'; ctx.fillRect(8,8,200,44);
+      ctx.fillStyle='#fff'; ctx.font='14px system-ui, Arial'; ctx.fillText('Score: '+score,16,30); ctx.fillText('High: '+high,120,30);
+
+      requestAnimationFrame(render);
+    }
+
+    function drawEyes(cx,cy){
+      const eyeR = Math.max(2,CELL*0.08), pupilR = Math.max(1.2,CELL*0.04);
+      let ox=0, oy=0; const off = CELL*0.18;
+      if (dir.x===1) ox=off; else if (dir.x===-1) ox=-off; else if (dir.y===-1) oy=-off; else if (dir.y===1) oy=off;
+      const perpX = -oy, perpY = ox;
+      const ex1 = cx + ox + perpX*0.5, ey1 = cy + oy + perpY*0.5;
+      const ex2 = cx + ox - perpX*0.5, ey2 = cy + oy - perpY*0.5;
+      ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(ex1,ey1,eyeR,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(ex2,ey2,eyeR,0,Math.PI*2); ctx.fill();
+      const pOff = CELL*0.06;
+      const px1 = ex1 + (ox ? Math.sign(ox)*pOff : 0), py1 = ey1 + (oy ? Math.sign(oy)*pOff : 0);
+      const px2 = ex2 + (ox ? Math.sign(ox)*pOff : 0), py2 = ey2 + (oy ? Math.sign(oy)*pOff : 0);
+      ctx.fillStyle='#000'; ctx.beginPath(); ctx.arc(px1,py1,pupilR,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(px2,py2,pupilR,0,Math.PI*2); ctx.fill();
+    }
+
+    // Input
+    function setDirection(dx,dy){ if (!running) return; if (dx===-dir.x && dy===-dir.y) return; nextDir={x:dx,y:dy}; }
+    window.addEventListener('keydown', (e)=>{ const k=e.key; if (k==='ArrowLeft'||k==='a') setDirection(-1,0); if (k==='ArrowRight'||k==='d') setDirection(1,0); if (k==='ArrowUp'||k==='w') setDirection(0,-1); if (k==='ArrowDown'||k==='s') setDirection(0,1); if (k===' '){ if (running) pauseGame(); else { running=true; restartTick(); } } });
+
+    // Touch
+    let touchStart = null;
+    canvas.addEventListener('touchstart', (e)=>{ if (mobileSel.value==='dpad') return; const t=e.touches[0]; touchStart={x:t.clientX,y:t.clientY}; }, {passive:true});
+    canvas.addEventListener('touchmove', (e)=>{ if (!touchStart) return; const t=e.touches[0]; const dx=t.clientX-touchStart.x, dy=t.clientY-touchStart.y; const ax=Math.abs(dx), ay=Math.abs(dy); if (Math.max(ax,ay)>30){ if (ax>ay){ if (dx>0) setDirection(1,0); else setDirection(-1,0); } else { if (dy>0) setDirection(0,1); else setDirection(0,-1); } touchStart=null; } }, {passive:true});
+    canvas.addEventListener('touchend', ()=>{ touchStart=null; });
+
+    // UI wiring
+    startBtn.addEventListener('click', startGame);
+    pauseBtn.addEventListener('click', ()=>{ if (running) pauseGame(); else { running=true; restartTick(); pauseBtn.textContent='Pause'; } });
+    restartBtn.addEventListener('click', startGame);
+    muteBtn.addEventListener('click', ()=>{ sfxMuted = !sfxMuted; muteBtn.textContent = sfxMuted ? 'Unmute SFX' : 'Mute SFX'; });
+    smoothRange.addEventListener('input', ()=>{ smooth = parseFloat(smoothRange.value); });
+
+    // Live obstacle toggle: enable/disable obstacles without restarting
+    obstacleToggle.addEventListener('change', ()=>{
+      if (!obstacleToggle.checked){ obstacles = []; notify('Obstacles disabled'); }
+      else { obstacles = generateObstaclesFromSettings(); notify('Obstacles enabled (apply Start to regenerate)'); }
+    });
+
+    // Defensive attach
+    if (!startBtn.onclick) startBtn.addEventListener('click', startGame);
+
+    // Start render loop
+    requestAnimationFrame(render);
+
+    // Expose API
+    window._snake = { start:startGame, pause:pauseGame, reset:resetState, regenerateObstacles: ()=>{ obstacles = generateObstaclesFromSettings(); } };
+
+    // Ensure active display updates every second
+    setInterval(()=>{ updateActivePower(); }, 1000);
+
+    // Safety: ensure controls panel is interactive
+    document.getElementById('controlsPanel').style.zIndex = 80;
+
+    // Initialize UI values
+    scoreEl.textContent = score; highEl.textContent = high;
+  })();
+  </script>
+</body>
+</html>
